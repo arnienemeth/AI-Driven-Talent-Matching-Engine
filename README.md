@@ -38,4 +38,33 @@ Experience Multipliers: Automated bonuses for candidates with 5+ or 8+ years of 
 
 4. Real-time Dashboard Synchronization The final output is normalized into a JSON structure and pushed via the Google Sheets API. This transforms a folder of resumes into a live, prioritized dashboard with strengths, concerns, and tailored recommendations ready for the HR team.
 
+
+
+Here is a concise breakdown of how your automated "Talent Matching Engine" operates:
+
+1. Input Phase: Setting the Bar
+You define the "Ideal Candidate" in your Job Requirements sheet. By assigning Weights (importance) and Types (Required vs. Optional) to specific hard skills, soft skills, and experience levels, you create the logical blueprint the AI uses for evaluation.
+
+2. Trigger Phase: CV Ingestion
+Whenever new candidate CVs are uploaded to your designated Google Drive folder, the n8n workflow automatically triggers. It extracts the raw text from various file formats (PDF, DOCX) and prepares it for analysis.
+
+3. AI Processing: Semantic Evaluation
+The system sends the requirements and the CV text to OpenAI (GPT-4o). Instead of just looking for keywords, the AI performs Semantic Matching—understanding that a "Lead Developer" likely has "Team Management" skills even if the exact phrase isn't used. It extracts the candidate's years of experience, education, and specific skill matches.
+
+4. Scoring Logic: The "Grace" Curve
+The custom JavaScript in the workflow applies your scoring algorithm:
+
+Weighted Scoring: Matches are calculated against your specific skill weights.
+
+Seniority Bonus: Automatic extra points are added for candidates exceeding your experience threshold (e.g., 5+ years).
+
+The 85% Rule: Scores are calculated against 85% of the total required weight to ensure qualified but "non-perfect" candidates aren't ignored.
+
+5. Output Phase: The Results Dashboard
+The final data is pushed to your CV_Screening_Results sheet. Each candidate is assigned:
+
+A Final Score (0–100): A precise numerical value of their fit.
+
+A Recommendation Flag: A clear status of STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH, or NOT_RECOMMENDED, allowing recruiters to prioritize their day in seconds.
+
 #BuildInPublic #n8n #AutomationEngineering #OpenAI #DataArchitecture
