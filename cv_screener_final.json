@@ -1,0 +1,307 @@
+{
+  "name": "CV Screener - Fixed Scoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "'1Py0cym3rZ8tEzHyaO-JiqmuJskBDh80S' in parents and trashed=false"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "list-files",
+      "name": "1. List Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst files = response.files || [];\n\nconst results = [];\nfor (const file of files) {\n  if (file.name.endsWith('.txt') || file.name.endsWith('.docx') || file.name.endsWith('.pdf')) {\n    results.push({\n      json: {\n        fileId: file.id,\n        fileName: file.name\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "extract",
+      "name": "2. Extract Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "Job_Requirements"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Required_Skills",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "read-req",
+      "name": "3. Read Requirements",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [750, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileItems = $('2. Extract Files').all();\nconst reqItems = $input.all();\n\nconst skills = [];\nlet totalWeight = 0;\n\nfor (const item of reqItems) {\n  const skill = item.json.Skill || '';\n  const weight = parseInt(item.json.Weight) || 5;\n  \n  if (!skill) continue;\n  skills.push({ skill, weight });\n  totalWeight += weight;\n}\n\n// Build skills string with weights\nconst skillsStr = skills.map(s => `${s.skill} (weight: ${s.weight})`).join(', ');\n\nconst results = [];\nfor (const f of fileItems) {\n  results.push({\n    json: {\n      fileId: f.json.fileId,\n      fileName: f.json.fileName,\n      skillsWithWeights: skillsStr,\n      totalWeight: totalWeight\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "prepare",
+      "name": "4. Prepare Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "download",
+      "name": "5. Download CV",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1250, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-text",
+      "name": "6. Extract Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [1500, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allPrepared = $('4. Prepare Files').all();\nconst idx = $itemIndex;\nconst fileInfo = allPrepared[idx]?.json || {};\n\nconst fileName = fileInfo.fileName || 'unknown';\nconst fileId = fileInfo.fileId || '';\nconst skillsWithWeights = fileInfo.skillsWithWeights || '';\nconst totalWeight = fileInfo.totalWeight || 100;\n\nconst inputData = $input.item;\nlet rawText = '';\n\ntry {\n  if (inputData.json) {\n    if (typeof inputData.json.text === 'string') rawText = inputData.json.text;\n    else if (typeof inputData.json.data === 'string') rawText = inputData.json.data;\n    else {\n      for (const key of Object.keys(inputData.json)) {\n        if (typeof inputData.json[key] === 'string' && inputData.json[key].length > 50) {\n          rawText = inputData.json[key];\n          break;\n        }\n      }\n    }\n  }\n} catch (e) {}\n\nfunction cleanText(text) {\n  if (!text) return '';\n  let cleaned = '';\n  for (let i = 0; i < text.length; i++) {\n    const code = text.charCodeAt(i);\n    if (code >= 32 && code <= 126) cleaned += text[i];\n    else if (code === 10 || code === 13) cleaned += ' ';\n  }\n  return cleaned.replace(/\\s+/g, ' ').trim();\n}\n\nlet cvText = cleanText(rawText);\nif (!cvText || cvText.length < 50) cvText = 'ERROR: Could not extract text from ' + fileName;\ncvText = cvText.substring(0, 7000);\n\nconst prompt = `You are an expert HR recruiter. Analyze this CV against the required skills and calculate a match score.\n\nREQUIRED SKILLS (with importance weights):\n${skillsWithWeights}\n\nTotal possible points: ${totalWeight}\n\nSCORING INSTRUCTIONS:\n1. For EACH required skill, check if the candidate has it\n2. If skill is found: add its weight to the score\n3. If skill is NOT found: add 0 points\n4. Calculate final percentage: (earned points / ${totalWeight}) * 100\n\nSKILL MATCHING GUIDELINES:\n- LLM = GPT, OpenAI, Copilot, ChatGPT, Claude, AI models, Large Language Models\n- Prompt Engineering = prompt design, AI prompts, prompt optimization, prompt crafting\n- Data Analytics = data analysis, analytics, BI, business intelligence, data insights\n- Power BI = PowerBI, Microsoft BI (do NOT count general BI experience)\n- Excel = Microsoft Excel, spreadsheets, xlsx\n- Python = Python programming, py, pandas, numpy\n- SQL = SQL queries, MySQL, PostgreSQL, databases\n- Be GENEROUS in matching - if someone has related experience, count it\n\nRECOMMENDATION THRESHOLDS:\n- 80-100%: STRONG_MATCH - Excellent fit\n- 60-79%: GOOD_MATCH - Good candidate\n- 40-59%: PARTIAL_MATCH - Has potential\n- 20-39%: WEAK_MATCH - Missing key skills\n- 0-19%: NOT_RECOMMENDED - Poor fit\n\nReturn ONLY this JSON (no other text):\n{\n  \"name\": \"candidate full name\",\n  \"email\": \"email or empty string\",\n  \"phone\": \"phone or empty string\",\n  \"role\": \"current/most recent job title\",\n  \"experience\": years as number,\n  \"education\": \"highest degree\",\n  \"matched\": [\"skill1\", \"skill2\"],\n  \"missing\": [\"skill3\", \"skill4\"],\n  \"earnedPoints\": number,\n  \"score\": percentage 0-100,\n  \"recommendation\": \"STRONG_MATCH/GOOD_MATCH/PARTIAL_MATCH/WEAK_MATCH/NOT_RECOMMENDED\",\n  \"strengths\": [\"strength1\", \"strength2\"],\n  \"concerns\": [\"concern1\", \"concern2\"]\n}`;\n\nreturn {\n  json: {\n    fileName,\n    fileId,\n    prompt,\n    cvText,\n    totalWeight\n  }\n};"
+      },
+      "id": "build",
+      "name": "7. Build Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"system\", \"content\": {{ JSON.stringify($json.prompt) }}},\n    {\"role\": \"user\", \"content\": {{ JSON.stringify(\"Analyze this CV:\\n\\n\" + $json.cvText) }}}\n  ]\n}",
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "openai",
+      "name": "8. Call OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allBuilds = $('7. Build Request').all();\nconst idx = $itemIndex;\nconst prev = allBuilds[idx]?.json || {};\n\nconst response = $input.item.json;\n\nlet resultText = '';\ntry {\n  resultText = response.choices[0].message.content;\n} catch (e) {\n  resultText = '{}';\n}\n\nlet result = {};\ntry {\n  resultText = resultText.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n  result = JSON.parse(resultText);\n} catch (e) {\n  result = { name:'Parse Error', email:'', phone:'', role:'', experience:0, education:'',\n    matched:[], missing:[], earnedPoints:0, score:0, recommendation:'ERROR',\n    strengths:[], concerns:['JSON parse error: ' + e.message] };\n}\n\nconst toStr = arr => Array.isArray(arr) ? arr.join(', ') : String(arr||'');\nlet phone = String(result.phone||'');\nif (phone.startsWith('+')) phone = \"'\" + phone;\n\n// Ensure score is between 0-100\nlet score = parseInt(result.score) || 0;\nif (score < 0) score = 0;\nif (score > 100) score = 100;\n\nreturn {\n  json: {\n    date: new Date().toISOString().split('T')[0],\n    file: prev.fileName||'',\n    fileId: prev.fileId||'',\n    name: result.name||'',\n    email: result.email||'',\n    phone,\n    role: result.role||'',\n    experience: result.experience||0,\n    education: result.education||'',\n    matched: toStr(result.matched),\n    missing: toStr(result.missing),\n    missingCritical: '',\n    score: score,\n    recommendation: result.recommendation||'',\n    strengths: toStr(result.strengths),\n    concerns: toStr(result.concerns)\n  }\n};"
+      },
+      "id": "parse",
+      "name": "9. Parse Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "CV_Screening_Results"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.date }}",
+            "file": "={{ $json.file }}",
+            "fileId": "={{ $json.fileId }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "role": "={{ $json.role }}",
+            "experience": "={{ $json.experience }}",
+            "education": "={{ $json.education }}",
+            "matched": "={{ $json.matched }}",
+            "missing": "={{ $json.missing }}",
+            "missingCritical": "={{ $json.missingCritical }}",
+            "score": "={{ $json.score }}",
+            "recommendation": "={{ $json.recommendation }}",
+            "strengths": "={{ $json.strengths }}",
+            "concerns": "={{ $json.concerns }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "date", "displayName": "date", "type": "string"},
+            {"id": "file", "displayName": "file", "type": "string"},
+            {"id": "fileId", "displayName": "fileId", "type": "string"},
+            {"id": "name", "displayName": "name", "type": "string"},
+            {"id": "email", "displayName": "email", "type": "string"},
+            {"id": "phone", "displayName": "phone", "type": "string"},
+            {"id": "role", "displayName": "role", "type": "string"},
+            {"id": "experience", "displayName": "experience", "type": "number"},
+            {"id": "education", "displayName": "education", "type": "string"},
+            {"id": "matched", "displayName": "matched", "type": "string"},
+            {"id": "missing", "displayName": "missing", "type": "string"},
+            {"id": "missingCritical", "displayName": "missingCritical", "type": "string"},
+            {"id": "score", "displayName": "score", "type": "number"},
+            {"id": "recommendation", "displayName": "recommendation", "type": "string"},
+            {"id": "strengths", "displayName": "strengths", "type": "string"},
+            {"id": "concerns", "displayName": "concerns", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "save",
+      "name": "10. Save to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2500, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [[{"node": "1. List Files", "type": "main", "index": 0}]]
+    },
+    "1. List Files": {
+      "main": [[{"node": "2. Extract Files", "type": "main", "index": 0}]]
+    },
+    "2. Extract Files": {
+      "main": [[{"node": "3. Read Requirements", "type": "main", "index": 0}]]
+    },
+    "3. Read Requirements": {
+      "main": [[{"node": "4. Prepare Files", "type": "main", "index": 0}]]
+    },
+    "4. Prepare Files": {
+      "main": [[{"node": "5. Download CV", "type": "main", "index": 0}]]
+    },
+    "5. Download CV": {
+      "main": [[{"node": "6. Extract Text", "type": "main", "index": 0}]]
+    },
+    "6. Extract Text": {
+      "main": [[{"node": "7. Build Request", "type": "main", "index": 0}]]
+    },
+    "7. Build Request": {
+      "main": [[{"node": "8. Call OpenAI", "type": "main", "index": 0}]]
+    },
+    "8. Call OpenAI": {
+      "main": [[{"node": "9. Parse Result", "type": "main", "index": 0}]]
+    },
+    "9. Parse Result": {
+      "main": [[{"node": "10. Save to Sheet", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 600
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-12-26T00:00:00.000Z",
+  "versionId": "25"
+}

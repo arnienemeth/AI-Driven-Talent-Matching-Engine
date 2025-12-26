@@ -1,0 +1,535 @@
+{
+  "name": "AI-Driven Talent Matching Engine",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ea2db394-85c0-4658-a8f4-11e2f278543d",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "'1Py0cym3rZ8tEzHyaO-JiqmuJskBDh80S' in parents and trashed=false"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ae3358b7-b44c-426b-bf5d-bc1d492185f7",
+      "name": "1. List Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Maa78DxKus2KU58w",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst files = response.files || [];\n\nconst results = [];\nfor (const file of files) {\n  if (file.name.endsWith('.txt') || file.name.endsWith('.docx') || file.name.endsWith('.pdf')) {\n    results.push({\n      json: {\n        fileId: file.id,\n        fileName: file.name\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "192c9cd5-6b3a-427d-8a15-7a313f1c523e",
+      "name": "2. Extract Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "13MLkk0eJXMm5824VC5JUqo3QEugHaVTzCRRbtcG2Vq0",
+          "mode": "list",
+          "cachedResultName": "Job_Requirements_Simple",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13MLkk0eJXMm5824VC5JUqo3QEugHaVTzCRRbtcG2Vq0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1654760736,
+          "mode": "list",
+          "cachedResultName": "Required_Skills",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13MLkk0eJXMm5824VC5JUqo3QEugHaVTzCRRbtcG2Vq0/edit#gid=1654760736"
+        },
+        "options": {}
+      },
+      "id": "c7b33a31-841c-4ddb-a1d2-391a4e6725a9",
+      "name": "3. Read Requirements",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        704,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HMz6UdPG2jdyM31k",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileItems = $('2. Extract Files').all();\nconst reqItems = $input.all();\n\nconst skillDict = {};\nlet requiredSum = 0;\n\nreqItems.forEach(item => {\n  const name = item.json.Skill;\n  if (!name) return;\n  \n  const weight = parseFloat(item.json.Weight) || 0;\n  const type = (item.json.Type || '').toLowerCase();\n  const notes = item.json.Notes || '';\n\n  // Standardize the key: \"SQL Fundamentals\" -> \"sqlfundamentals\"\n  const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');\n  \n  skillDict[key] = { name, weight, type, notes };\n  if (type === 'required') requiredSum += weight;\n});\n\n// Corrected mapping using the keys actually output by Node 2\nreturn fileItems.map(f => ({\n  json: {\n    fileName: f.json.fileName, // Use .fileName, not .name\n    fileId: f.json.fileId,     // Use .fileId, not .id\n    skillDict: skillDict,\n    requiredSum: requiredSum\n  }\n}));"
+      },
+      "id": "1f698a83-de7e-4de4-bd5a-07b702f8178d",
+      "name": "4. Prepare Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "432bd168-3d65-412d-b16b-35dd2f46891e",
+      "name": "5. Download CV",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1136,
+        0
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Maa78DxKus2KU58w",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "17f6a1ca-7880-4840-b74d-1895c847bdb0",
+      "name": "6. Extract Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Pull text from the extraction node (Node 6)\nconst cvText = ($json.text || $json.data || \"\").substring(0, 10000);\n\n// 2. REACH BACK to Node 4 for the master skill rules\nconst anchor = $('4. Prepare Files').item.json;\nconst dict = anchor.skillDict;\n\nconst skillInstructions = Object.values(dict).map(s => \n  `- ${s.name}: (Match if CV mentions: ${s.notes})`\n).join('\\n');\n\n// 3. Construct the prompt\nconst prompt = `You are a Senior Technical Recruiter. Evaluate the CV for a \"Generalist Data Expert\" role.\n\nINSTRUCTION: Use SEMANTIC MATCHING. \n- \"TensorFlow/PyTorch\" counts as \"Machine Learning\"\n- \"Pandas/NumPy/Scikit-Learn\" counts as \"Python\"\n- \"Tableau/Power BI\" counts as \"BI Tools\"\n\nCRITICAL: If a candidate demonstrates high-level mastery in a complex area (like building LLM agents or managing cloud architecture), assume they possess the foundational skills associated with it (like Data Literacy or basic SQL) even if not explicitly stated.\n\nCV CONTENT:\n${cvText}\n\nLIST OF SKILLS TO MATCH (Use these exact names):\n${skillInstructions}\n\nReturn ONLY this JSON:\n{\n  \"name\": \"Candidate Name\",\n  \"email\": \"email@address.com\",\n  \"phone\": \"phone number\",\n  \"experience\": 5,\n  \"education\": \"Master's in Data Science\",\n  \"matched_skills\": [\"Exact Skill Name 1\", \"Exact Skill Name 2\"],\n  \"strengths\": \"Short summary of strengths\",\n  \"concerns\": \"Any red flags\"\n}`;\n\n// 4. Return both the prompt and cvText so Node 8 can see them\nreturn {\n  json: { \n    prompt,\n    cvText \n  }\n};"
+      },
+      "id": "f1708818-e86b-47b7-bd72-07c2c8049dd6",
+      "name": "7. Build Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"system\", \"content\": {{ JSON.stringify($json.prompt) }}},\n    {\"role\": \"user\", \"content\": {{ JSON.stringify(\"Analyze this CV:\\n\\n\" + $json.cvText) }}}\n  ]\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "b19beda9-e262-41dd-96b2-88b7756883b6",
+      "name": "8. Call OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "UisEeNAE3fcnIyFa",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const aiRaw = $json.choices[0].message.content;\nconst anchor = $('4. Prepare Files').item.json;\nconst skillDict = anchor.skillDict;\n\nlet aiResult;\ntry {\n  aiResult = JSON.parse(aiRaw.replace(/```json|```/g, ''));\n} catch (e) {\n  aiResult = { name: \"Error\", matched_skills: [], experience: 0 };\n}\n\nlet earnedPoints = 0;\nlet totalRequiredWeight = 0;\nconst matchedNames = [];\nconst missingNames = [];\n\n// 1. Normalize AI matches\nconst aiMatches = new Set((aiResult.matched_skills || []).map(s => s.toLowerCase().replace(/[^a-z0-9]/g, '')));\n\n// 2. Calculate Skill Score\nObject.keys(skillDict).forEach(key => {\n  const skill = skillDict[key];\n  if (skill.type === 'required') {\n    totalRequiredWeight += skill.weight;\n  }\n  \n  if (aiMatches.has(key)) {\n    earnedPoints += skill.weight;\n    matchedNames.push(skill.name);\n  } else {\n    missingNames.push(skill.name);\n  }\n});\n\n// 3. LOGICAL OVERRIDE: Experience Bonus\n// If they have 8+ years experience, give them a 10% score boost automatically\nlet experienceBonus = 0;\nconst years = parseInt(aiResult.experience) || 0;\nif (years >= 8) experienceBonus = 10;\nelse if (years >= 4) experienceBonus = 5;\n\n// 4. Calculate Final Score (Capped at 100)\n// We divide by 85% of total weight to make it \"less strict\"\nconst baselineScore = (earnedPoints / (totalRequiredWeight * 0.85)) * 100;\nlet finalScore = Math.min(100, Math.round(baselineScore + experienceBonus));\n\n// 5. Logical Recommendation Thresholds\nlet rec = \"NOT_RECOMMENDED\";\nif (finalScore >= 75) rec = \"STRONG_MATCH\";\nelse if (finalScore >= 55) rec = \"GOOD_MATCH\";\nelse if (finalScore >= 35) rec = \"PARTIAL_MATCH\";\n\nreturn {\n  json: {\n    date: new Date().toISOString().split('T')[0],\n    name: aiResult.name || \"Unknown\",\n    email: aiResult.email || \"N/A\",\n    phone: aiResult.phone || \"N/A\",\n    experience: years,\n    education: aiResult.education || \"N/A\",\n    score: finalScore,\n    recommendation: rec,\n    matched: matchedNames.join(', '),\n    missing: missingNames.join(', '),\n    strengths: aiResult.strengths || \"\",\n    concerns: aiResult.concerns || \"\"\n  }\n};"
+      },
+      "id": "945f1889-9f6b-4e77-a8a3-20d094ba4ae2",
+      "name": "9. Parse Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1lDvHEuRo2DoyJRj3DrpGxwz3L9kPTLb9WmecNFMh0BQ",
+          "mode": "list",
+          "cachedResultName": "CV_Screening_Results",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lDvHEuRo2DoyJRj3DrpGxwz3L9kPTLb9WmecNFMh0BQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "date": "={{ $json.date }}",
+            "file": "={{ $json.file }}",
+            "fileId": "={{ $json.fileId }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "role": "={{ $json.role }}",
+            "experience": "={{ $json.experience }}",
+            "education": "={{ $json.education }}",
+            "matched": "={{ $json.matched }}",
+            "missing": "={{ $json.missing }}",
+            "missingCritical": "={{ $json.missingCritical }}",
+            "score": "={{ $json.score }}",
+            "recommendation": "={{ $json.recommendation }}",
+            "strengths": "={{ $json.strengths }}",
+            "concerns": "={{ $json.concerns }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "type": "string"
+            },
+            {
+              "id": "file",
+              "displayName": "file",
+              "type": "string"
+            },
+            {
+              "id": "fileId",
+              "displayName": "fileId",
+              "type": "string"
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "type": "string"
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "type": "string"
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "type": "string"
+            },
+            {
+              "id": "experience",
+              "displayName": "experience",
+              "type": "number"
+            },
+            {
+              "id": "education",
+              "displayName": "education",
+              "type": "string"
+            },
+            {
+              "id": "matched",
+              "displayName": "matched",
+              "type": "string"
+            },
+            {
+              "id": "missing",
+              "displayName": "missing",
+              "type": "string"
+            },
+            {
+              "id": "missingCritical",
+              "displayName": "missingCritical",
+              "type": "string"
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "type": "number"
+            },
+            {
+              "id": "recommendation",
+              "displayName": "recommendation",
+              "type": "string"
+            },
+            {
+              "id": "strengths",
+              "displayName": "strengths",
+              "type": "string"
+            },
+            {
+              "id": "concerns",
+              "displayName": "concerns",
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "be563494-290a-40d2-9bd0-4b6402f4852c",
+      "name": "10. Save to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2176,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HMz6UdPG2jdyM31k",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Data Acquisition (Header\n\nThis section covers the initial connection to your data sources.\n\nPurpose: Triggers the workflow and fetches the raw candidate files and job requirements.\n\nNodes Included: Start, 1. List Files, 2. Extract Files, and 3. Read Requirements.\n\nKey Instruction: Ensure the Google Drive folder ID and Google Sheet ID are correctly set to the source of your CVs.",
+        "height": 336,
+        "width": 528,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        64,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "678dfa92-8e5e-423f-93d9-c809fa58869a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Data Preparation (Basic Rules)\n\nThis section is the \"brain\" of your matching logic where the scoring rules are defined.\n\nPurpose: Standardizes the skill dictionary and downloads the actual file content for processing.\n\nNodes Included: 4. Prepare Files and 5. Download CV.\n\nKey Instruction: Node 4 establishes the skillDict and requiredSum used for the final score. Any changes to weights or \"Required\" vs \"Optional\" types should be handled in the source sheet before this step.",
+        "height": 336,
+        "width": 576
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "d934f250-21e4-44d3-b1dc-1ca5641fd8d3",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "AI Analysis & Results (Details)\n\nThis section handles the complex text extraction and final output.\n\nPurpose: Uses GPT-4o-mini to semantically screen the CV and then applies your custom scoring curve to the results.\n\nNodes Included: 6. Extract Text, 7. Build Request, 8. Call OpenAI, 9. Parse Result, and 10. Save to Sheet.\n\nKey Instruction: * Node 7: Contains the semantic instructions (e.g., \"TensorFlow\" = \"Machine Learning\").\n\nNode 9: Applies the 15% scoring \"grace\" and experience bonuses before saving to the final results sheet.",
+        "height": 336,
+        "width": 592,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1616,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "c20c8b5a-b4a6-47a9-9467-f14c2dc07dbe",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "1. List Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. List Files": {
+      "main": [
+        [
+          {
+            "node": "2. Extract Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Extract Files": {
+      "main": [
+        [
+          {
+            "node": "3. Read Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Read Requirements": {
+      "main": [
+        [
+          {
+            "node": "4. Prepare Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Prepare Files": {
+      "main": [
+        [
+          {
+            "node": "5. Download CV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Download CV": {
+      "main": [
+        [
+          {
+            "node": "6. Extract Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Extract Text": {
+      "main": [
+        [
+          {
+            "node": "7. Build Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Build Request": {
+      "main": [
+        [
+          {
+            "node": "8. Call OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Call OpenAI": {
+      "main": [
+        [
+          {
+            "node": "9. Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Parse Result": {
+      "main": [
+        [
+          {
+            "node": "10. Save to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "0722b851-1116-4226-94e3-3ddee865e3a2",
+  "meta": {
+    "instanceId": "cd93a34108e55d377e7be7a09afb339d52eaa01006aedd0402ecf40aff240be4"
+  },
+  "id": "y1JrT3tTfuaFiMjN",
+  "tags": []
+}
