@@ -1,70 +1,244 @@
-Stop keyword matching. Start semantic screening. 🚀
+🧠 AI-Driven Talent Matching Engine
 
-I just finished building an automated recruitment pipeline that does what traditional ATS systems can’t: it actually understands candidate experience.
+Stop keyword matching. Start semantic screening.
 
-Instead of hunting for exact words, this engine uses AI to "think" like a Senior Recruiter, mapping complex skills and evaluating leadership maturity automatically.
+Traditional ATS systems fail because they treat CVs like keyword buckets.
+This project introduces a semantic, human-centric recruitment engine that evaluates candidates the way a Senior Recruiter would — understanding skills, experience, leadership maturity, and potential.
 
-What makes this exceptional for HR & Headhunters? ✅ Semantic Intelligence: If a candidate mentions "PyTorch," the system knows they have "Machine Learning" skills—even if the word isn't there. ✅ Dynamic Requirements: Recruiter-friendly. Want to change the criteria? Just update a Google Sheet. No coding required. ✅ Human-Centric Scoring: The logic isn't binary. It applies "grace curves" and rewards seniority, ensuring high-potential candidates aren't filtered out by rigid rules. ✅ Zero Data Entry: From a Google Drive upload to a fully populated dashboard in seconds.
+Built with n8n + OpenAI + Google Workspace, this solution turns raw CVs into a ranked, decision-ready dashboard in seconds.
 
-The Tech Stack:
+🚀 What This Project Does
 
-n8n: The orchestration "brain" connecting the entire flow.
+This repository contains a fully automated AI-powered CV screening pipeline that:
 
-OpenAI (GPT-4o): Used for deep-text extraction and candidate sentiment analysis.
+Understands skills semantically, not literally
 
-Google Drive & Sheets: Serving as the seamless UI for file storage and the final recruitment dashboard.
+Applies weighted, recruiter-defined job requirements
 
-Custom JavaScript: Where the magic happens—tailored scoring algorithms that calculate weights, bonuses, and recommendations.
+Uses grace curves instead of rigid pass/fail logic
 
-Recruitment shouldn't be a manual grind. It should be about finding the right person, faster.
+Produces clear hiring recommendations (STRONG_MATCH → NOT_RECOMMENDED)
 
-#n8n #AI #RecruitmentTech #Automation #FutureOfWork #GenerativeAI
+Requires zero manual data entry
 
+🎯 Why This Matters
+❌ Traditional ATS
 
-🛠️ Technical Deep Dive: Under the Hood
-For those interested in the architecture, here is how the Talent Matching Engine handles the heavy lifting:
+Keyword-based
 
-1. Scalable Ingestion & Parsing The workflow uses n8n as the orchestrator to monitor Google Drive. We don’t just "read" files; we use a multi-stage extraction pipeline to convert unstructured PDF/DOCX data into normalized text strings, handling various formatting styles without losing context.
+Rigid filters
 
-2. LLM-Powered Semantic Mapping Instead of rigid keyword matching, we leverage GPT-4o-mini to perform semantic analysis. The system is instructed to understand hierarchies (e.g., recognizing that "DAX" proficiency implies "Power BI" expertise). This prevents high-quality candidates from being filtered out simply because they didn't use a specific "buzzword."
+High false negatives
 
-3. Weighted Scoring & "Grace Curves" This is where the custom logic lives. Using JavaScript (Node.js) nodes, we calculate a dynamic score based on:
+Black-box scoring
 
-Required vs. Optional Weights: Defined by the user in a simple Google Sheet.
+✅ This Engine
 
-The 85% Grace Factor: We calculate the "baseline" score against 85% of total required weight, acknowledging that a perfect 100% match is rare.
+Context-aware semantic reasoning
 
-Experience Multipliers: Automated bonuses for candidates with 5+ or 8+ years of tenure.
+Recruiter-friendly configuration (Google Sheets)
 
-4. Real-time Dashboard Synchronization The final output is normalized into a JSON structure and pushed via the Google Sheets API. This transforms a folder of resumes into a live, prioritized dashboard with strengths, concerns, and tailored recommendations ready for the HR team.
+Transparent scoring logic
 
+Designed to surface high-potential candidates
 
+🧩 Core Features
+✅ Semantic Intelligence
 
-Here is a concise breakdown of how your automated "Talent Matching Engine" operates:
+Understands that:
 
-1. Input Phase: Setting the Bar
-You define the "Ideal Candidate" in your Job Requirements sheet. By assigning Weights (importance) and Types (Required vs. Optional) to specific hard skills, soft skills, and experience levels, you create the logical blueprint the AI uses for evaluation.
+DAX ⇒ Power BI
 
-2. Trigger Phase: CV Ingestion
-Whenever new candidate CVs are uploaded to your designated Google Drive folder, the n8n workflow automatically triggers. It extracts the raw text from various file formats (PDF, DOCX) and prepares it for analysis.
+PyTorch ⇒ Machine Learning
 
-3. AI Processing: Semantic Evaluation
-The system sends the requirements and the CV text to OpenAI (GPT-4o). Instead of just looking for keywords, the AI performs Semantic Matching—understanding that a "Lead Developer" likely has "Team Management" skills even if the exact phrase isn't used. It extracts the candidate's years of experience, education, and specific skill matches.
+Lead Developer ⇒ Leadership & team management
 
-4. Scoring Logic: The "Grace" Curve
-The custom JavaScript in the workflow applies your scoring algorithm:
+✅ Dynamic Job Requirements
 
-Weighted Scoring: Matches are calculated against your specific skill weights.
+Job criteria live in Google Sheets
 
-Seniority Bonus: Automatic extra points are added for candidates exceeding your experience threshold (e.g., 5+ years).
+Update skills, weights, or priorities without touching the workflow
 
-The 85% Rule: Scores are calculated against 85% of the total required weight to ensure qualified but "non-perfect" candidates aren't ignored.
+Supports multiple roles (e.g. Data Analyst, Architect, ML Engineer)
 
-5. Output Phase: The Results Dashboard
-The final data is pushed to your CV_Screening_Results sheet. Each candidate is assigned:
+✅ Human-Centric Scoring
 
-A Final Score (0–100): A precise numerical value of their fit.
+Weighted evaluation (hard skills, soft skills, experience)
 
-A Recommendation Flag: A clear status of STRONG_MATCH, GOOD_MATCH, PARTIAL_MATCH, or NOT_RECOMMENDED, allowing recruiters to prioritize their day in seconds.
+Seniority bonuses
 
-#BuildInPublic #n8n #AutomationEngineering #OpenAI #DataArchitecture
+85% “grace rule” — perfection is not required
+
+✅ Fully Automated Flow
+
+From CV upload → ranked dashboard → optional recruiter notification
+
+🏗️ Architecture Overview
+Google Drive (CV Upload)
+        ↓
+n8n Workflow Orchestration
+        ↓
+Text Extraction (DOCX / Google Docs / PDF workaround)
+        ↓
+Semantic Analysis (OpenAI GPT-4o / GPT-4o-mini)
+        ↓
+Custom Scoring Logic (JavaScript)
+        ↓
+Google Sheets Results Dashboard
+
+🧠 How the Engine Works (Step-by-Step)
+1️⃣ Define the Ideal Candidate (Google Sheets)
+
+Recruiters define:
+
+Required skills (with importance weights)
+
+Nice-to-have skills
+
+Deal-breakers
+
+Experience expectations
+
+📄 Example role: Senior Data Analyst / Architect
+
+LLM & Prompt Engineering → Must-have
+
+Power BI, Excel, Power Query → Critical
+
+Python → Intermediate
+
+Tableau, University degree → Nice-to-have
+
+2️⃣ CV Ingestion (Google Drive)
+
+Upload a CV into a monitored folder
+
+n8n automatically triggers the workflow
+
+File metadata is captured
+
+3️⃣ Text Extraction
+
+Supports DOCX and Google Docs natively
+
+PDF handling via Google Docs conversion (memory-safe)
+
+Output: clean, normalized text
+
+4️⃣ Semantic AI Evaluation (OpenAI)
+
+The AI is instructed to:
+
+Extract structured candidate data
+
+Identify matched and missing skills
+
+Infer experience and seniority
+
+Assess leadership and overall fit
+
+📤 Output is strict JSON for reliability.
+
+5️⃣ Scoring Logic (Custom JavaScript)
+
+The engine applies:
+
+Weighted scoring based on job requirements
+
+Deal-breaker enforcement
+
+Experience multipliers
+
+85% grace curve to avoid over-filtering
+
+6️⃣ Results Dashboard (Google Sheets)
+
+Each candidate receives:
+
+Final score (0–100)
+
+Recommendation flag
+
+Strengths & concerns
+
+Interview focus suggestions
+
+This creates a live recruiter leaderboard.
+
+📊 Recommendation Levels
+Score Range	Recommendation
+85–100	STRONG_MATCH
+70–84	GOOD_MATCH
+55–69	PARTIAL_MATCH
+40–54	WEAK_MATCH
+< 40	NOT_RECOMMENDED
+🛠️ Tech Stack
+Component	Purpose
+n8n	Workflow orchestration
+OpenAI (GPT-4o / 4o-mini)	Semantic analysis
+Google Drive	CV ingestion
+Google Sheets	Job requirements & results
+JavaScript (Node.js)	Scoring & business logic
+📁 Repository Structure
+├── workflows/
+│   ├── cv_screener_sequential.json
+│   └── cv_screener_external_requirements.json
+│
+├── templates/
+│   └── Job_Requirements_Template.xlsx
+│
+├── docs/
+│   ├── architecture.png
+│   └── scoring_logic.md
+│
+└── README.md
+
+⚙️ Setup Guide (Quick Start)
+
+Clone the repo
+
+Import the workflow into n8n
+
+Upload Job_Requirements_Template.xlsx to Google Sheets
+
+Connect credentials:
+
+Google Drive
+
+Google Sheets
+
+OpenAI
+
+Upload a test CV (DOCX recommended)
+
+Activate the workflow 🚀
+
+⚠️ Known Limitations & Design Decisions
+
+PDFs are memory-heavy → Google Docs conversion is recommended
+
+AI output is validated and parsed defensively
+
+Designed for screening support, not autonomous hiring decisions
+
+🔮 Roadmap
+
+Multi-language CV support
+
+Bias & fairness diagnostics
+
+Vector database for talent pooling
+
+Hiring manager feedback loop
+
+UI dashboard (Looker / Streamlit)
+
+🧠 Philosophy
+
+Recruitment shouldn’t be about filtering people out.
+It should be about finding the right person, faster — and more fairly.
+
+📬 Feedback & Contributions
+
+This project is built #InPublic.
+Ideas, issues, and pull requests are welcome.
